@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>WAR FIELD ZONE</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101610;color:#fff;font-family:system-ui,Arial}#game{position:relative;width:100%;height:100%;background:#29372b}canvas{width:100%;height:100%;display:block;touch-action:none}#hud{position:absolute;inset:0;pointer-events:none;text-shadow:0 2px 4px #000;font-weight:800}.top{position:absolute;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;gap:8px;font-size:12px}.badge{background:#101813c9;border:1px solid #ffffff44;border-radius:8px;padding:7px 9px}.brand{color:#e9c66d;letter-spacing:1px}.bottom{position:absolute;bottom:12px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:end;gap:8px}.controls{display:flex;gap:6px;pointer-events:auto;flex-wrap:wrap;max-width:66%}button{background:#17231bdc;color:white;border:1px solid #ffffff66;border-radius:11px;min-width:44px;min-height:46px;padding:9px;font-weight:900;touch-action:none}button:active{background:#c69a40;color:#111}.fire{background:#a5352bdd;min-width:68px;min-height:68px;border-radius:50%;font-size:14px}.cross{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:24px;color:#fff;opacity:.9}.panel{max-width:390px;width:100%;background:#18231d;border:1px solid #647366;border-radius:18px;padding:22px}.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:18px;background:#07100ddd;text-align:center}.panel h1{margin:0;color:#e9c66d;letter-spacing:1px}.panel p{line-height:1.5;color:#d4ddd4}.panel button{width:100%;background:#d1a342;color:#161616;margin-top:8px;min-height:50px}.muted{font-size:12px;color:#b8c5b8}
+</style></head><body><div id="game"><canvas id="view"></canvas><div id="hud"><div class="top"><div class="badge"><div class="brand">WAR FIELD ZONE</div><div>REALISTIC COMBAT • BOT BATTLE</div></div><div class="badge" style="text-align:right">TIME <span id="time">10:00</span><br>YOU <span id="score">0</span> — <span id="enemy">0</span> BOT<br>HP <span id="hp">100</span> | <span id="weaponHud">M4</span> <span id="ammo">30</span></div></div><div class="cross">+</div><div class="bottom"><div class="controls"><button id="forward">▲</button><button id="left">◀</button><button id="back">▼</button><button id="right">▶</button><button id="swap">M4 / SNIPER</button></div><div class="controls"><button id="reload">RELOAD</button><button class="fire" id="fire">FIRE</button></div></div></div><div class="overlay" id="overlay"><div class="panel"><h1>WAR FIELD ZONE</h1><p>FIRST-PERSON COMBAT<br>Military arena • M4 • Sniper</p><p>Gerakkan pemain dengan tombol arah. Geser layar untuk mengubah arah pandang. Tekan FIRE untuk menembak.</p><p class="muted">Prototipe visual perspektif 3D dengan tekstur dan model senjata sederhana. Belum setara engine 3D penuh.</p><button id="start">MULAI PERTEMPURAN</button></div></div></div>
+<script>
+(()=>{
+const canvas=document.querySelector('#view'),ctx=canvas.getContext('2d');const $=id=>document.getElementById(id);
+let w=0,h=0,run=false,last=0,elapsed=0,ot=false,otLeft=0,score=0,enemy=0,hp=100,weapon=0,ammo=30,reload=0,fireHeld=false,keys={},player={x:0,z:0,a:0},bots=[],bullets=[],look=null,recoil=0,flash=0;
+function resize(){let r=canvas.getBoundingClientRect();w=canvas.width=Math.max(320,Math.floor(r.width));h=canvas.height=Math.max(240,Math.floor(r.height))}addEventListener('resize',resize);resize();
+function bot(){return{x:(Math.random()-.5)*28,z:10+Math.random()*32,hp:100,alive:true,respawn:0,cd:1+Math.random()*2}}
+function reset(){player={x:0,z:0,a:0};bots=Array.from({length:5},bot);bullets=[];score=enemy=0;hp=100;weapon=0;ammo=30;reload=0;elapsed=0;ot=false;otLeft=0;run=true;$('overlay').style.display='none';ui()}
+function ui(){let t=ot?otLeft:Math.max(0,600-elapsed);$('time').textContent=(ot?'OT ':'')+String(Math.floor(t/60)).padStart(2,'0')+':'+String(Math.floor(t%60)).padStart(2,'0');$('score').textContent=score;$('enemy').textContent=enemy;$('hp').textContent=Math.ceil(hp);$('weaponHud').textContent=weapon?'SNIPER':'M4';$('ammo').textContent=ammo}
+function finish(){run=false;$('overlay').style.display='flex';$('overlay').innerHTML=`<div class="panel"><h1>${score>enemy?'KAMU MENANG!':score<enemy?'BOT MENANG':'SERI'}</h1><p>Skor akhir ${score} — ${enemy}</p><button id="again">MAIN LAGI</button></div>`;$('again').onclick=reset}
+function period(){if(score!==enemy)finish();else{ot=true;otLeft=180}}
+function press(id){let b=$(id);b.addEventListener('pointerdown',e=>{e.preventDefault();keys[id]=true;b.setPointerCapture?.(e.pointerId)});for(let ev of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(ev,()=>keys[id]=false)}
+['forward','back','left','right'].forEach(press);
+$('swap').onclick=()=>{weapon=1-weapon;ammo=weapon?5:30;ui()};$('reload').onclick=()=>reload=weapon?1.8:1.2;
+$('fire').addEventListener('pointerdown',e=>{e.preventDefault();fireHeld=true});['pointerup','pointercancel','pointerleave'].forEach(e=>$('fire').addEventListener(e,()=>fireHeld=false));
+canvas.addEventListener('pointerdown',e=>{look={x:e.clientX,y:e.clientY};canvas.setPointerCapture?.(e.pointerId)});
+canvas.addEventListener('pointermove',e=>{if(look){player.a+=(e.clientX-look.x)*.008;look={x:e.clientX,y:e.clientY}}});
+canvas.addEventListener('pointerup',()=>look=null);canvas.addEventListener('pointercancel',()=>look=null);
+function shoot(from,angle,owner,damage,speed){bullets.push({x:from.x,z:from.z,a:angle,owner,damage,speed,life:2.2})}
+function fire(){if(!run||reload>0||ammo<=0)return;ammo--;shoot({x:player.x,z:player.z},player.a,'p',weapon?100:34,weapon?44:33);recoil=Math.min(1,recoil+.7);flash=.08;ui()}
+function update(dt){if(!run)return;elapsed+=dt;if(!ot&&elapsed>=600)period();else if(ot){otLeft-=dt;if(otLeft<=0){if(score!==enemy)finish();else otLeft=180}}
+let f=(keys.forward?1:0)-(keys.back?1:0),s=(keys.right?1:0)-(keys.left?1:0);player.x+=Math.sin(player.a)*f*7*dt+Math.cos(player.a)*s*5*dt;player.z+=Math.cos(player.a)*f*7*dt-Math.sin(player.a)*s*5*dt;player.x=Math.max(-40,Math.min(40,player.x));player.z=Math.max(-8,Math.min(65,player.z));
+if(reload>0){reload-=dt;if(reload<=0)ammo=weapon?5:30}if(fireHeld)fire();recoil=Math.max(0,recoil-dt*3);flash=Math.max(0,flash-dt);
+for(let b of bots){if(!b.alive){b.respawn-=dt;if(b.respawn<=0)Object.assign(b,bot());continue}let dx=player.x-b.x,dz=player.z-b.z,d=Math.hypot(dx,dz),a=Math.atan2(dx,dz);if(d>5){b.x+=Math.sin(a)*2.3*dt;b.z+=Math.cos(a)*2.3*dt}b.cd-=dt;if(b.cd<=0&&d<35){shoot({x:b.x,z:b.z},a,'b',8,18);b.cd=1+Math.random()*1.5}}
+for(let q of bullets){q.x+=Math.sin(q.a)*q.speed*dt;q.z+=Math.cos(q.a)*q.speed*dt;q.life-=dt;if(q.owner==='p'){for(let b of bots)if(b.alive&&Math.hypot(q.x-b.x,q.z-b.z)<1.3){b.hp-=q.damage;q.life=0;if(b.hp<=0){b.alive=false;b.respawn=2;score++}}}else if(Math.hypot(q.x-player.x,q.z-player.z)<1.1){hp-=q.damage;q.life=0;if(hp<=0){enemy++;hp=100;player.x=0;player.z=0}}}bullets=bullets.filter(q=>q.life>0);ui()}
+function project(x,y,z){let dx=x-player.x,dz=z-player.z,ca=Math.cos(player.a),sa=Math.sin(player.a),side=dx*ca-dz*sa,depth=dx*sa+dz*ca;if(depth<.35)return null;let focal=w*.78;return{x:w/2+side*focal/depth,y:h*.49+(y-1.6)*focal/depth,scale:focal/depth,depth}}
+function poly(points,color){ctx.fillStyle=color;ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill()}
+function box(x,z,ww,hh,col,roof){let p=project(x,0,z),q=project(x+ww,0,z);if(!p||!q)return;let wi=Math.abs(q.x-p.x),hei=Math.min(h*.7,p.scale*hh);let left=Math.min(p.x,q.x);ctx.fillStyle=col;ctx.fillRect(left,p.y-hei,wi,hei);ctx.fillStyle=roof||'#555b50';poly([{x:left,y:p.y-hei},{x:left+wi*.18,y:p.y-hei-p.scale*.15},{x:left+wi*1.1,y:p.y-hei-p.scale*.15},{x:left+wi,y:p.y-hei}],roof||'#555b50');ctx.fillStyle='#161c17';ctx.fillRect(left+wi*.2,p.y-hei*.48,wi*.16,hei*.24);ctx.fillRect(left+wi*.62,p.y-hei*.48,wi*.16,hei*.24)}
+function tree(x,z){let p=project(x,0,z);if(!p)return;let r=Math.min(45,p.scale*.62);ctx.fillStyle='#4b3b2b';ctx.fillRect(p.x-r*.12,p.y-r*1.2,r*.24,r*1.2);ctx.fillStyle='#2f4b2e';ctx.beginPath();ctx.arc(p.x,p.y-r*1.35,r*.8,0,Math.PI*2);ctx.fill();ctx.fillStyle='#3c6038';ctx.beginPath();ctx.arc(p.x-r*.2,p.y-r*1.55,r*.52,0,Math.PI*2);ctx.fill()}
+function draw(){// sky + atmospheric horizon
+let grad=ctx.createLinearGradient(0,0,0,h*.55);grad.addColorStop(0,'#7e9a9f');grad.addColorStop(.65,'#aeb7a8');grad.addColorStop(1,'#7b866e');ctx.fillStyle=grad;ctx.fillRect(0,0,w,h*.55);
+ctx.fillStyle='#535f43';ctx.fillRect(0,h*.49,w,h*.51);
+// distant haze and ground bands
+for(let i=1;i<20;i++){let y=h*.49+i*i*h*.0013;ctx.strokeStyle=i%2?'#66744f':'#747d54';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
+for(let i=0;i<80;i++){let x=(i*173)%w,y=h*.5+((i*83)%(h*.48));ctx.fillStyle=i%3?'#80835a88':'#353e2c88';ctx.fillRect(x,y,2+(i%4),1+(i%2))}
+ // military compound buildings and barriers
+for(let i=-5;i<=5;i++){box(i*8-3,34+(i%2)*5,5,4.2,i%2?'#777a70':'#676d62', '#4e574b');}
+for(let i=0;i<10;i++){let x=(i-5)*7;box(x,13+(i%3)*2,2.4,1.2,'#777b69','#515847')}
+for(let i=0;i<15;i++)tree(Math.sin(i*12.31)*35,8+(i*9)%48);
+ // bots
+for(let b of bots){if(!b.alive)continue;let p=project(b.x,0,b.z);if(!p)continue;let s=Math.min(75,p.scale*.9);ctx.fillStyle='#1e2722';ctx.fillRect(p.x-s*.24,p.y-s*.95,s*.48,s*.9);ctx.fillStyle='#9caa9a';ctx.fillRect(p.x-s*.2,p.y-s*1.18,s*.4,s*.27);ctx.fillStyle='#6b4636';ctx.fillRect(p.x-s*.3,p.y-s*.65,s*.6,s*.13);ctx.fillStyle='#171b17';ctx.fillRect(p.x-s*.48,p.y-s*.66,s*.75,s*.08);ctx.fillStyle='#252c27';ctx.fillRect(p.x-s*.23,p.y-s*.1,s*.17,s*.35);ctx.fillRect(p.x+s*.06,p.y-s*.1,s*.17,s*.35);ctx.fillStyle='#111';ctx.fillRect(p.x-s*.35,p.y-s*1.38,s*.7,3);ctx.fillStyle='#e14e40';ctx.fillRect(p.x-s*.35,p.y-s*1.38,s*.7*Math.max(0,b.hp/100),3)}
+for(let q of bullets){let p=project(q.x,0,q.z);if(p){ctx.fillStyle=q.owner==='p'?'#fff3b0':'#ff8d6e';ctx.beginPath();ctx.arc(p.x,p.y,Math.max(1,Math.min(4,p.scale*.08)),0,Math.PI*2);ctx.fill()}}
+ // visible weapon held at bottom, with stock, grip, receiver, barrel, sights and hand
+let bob=(keys.forward||keys.back||keys.left||keys.right)?Math.sin(performance.now()*.012)*3:0;let kick=recoil*14;ctx.save();ctx.translate(w*.56,h*.99+bob+kick);ctx.rotate(weapon?-.10:.04);
+if(!weapon){ // M4
+poly([{x:-w*.2,y:-h*.16},{x:-w*.1,y:-h*.2},{x:-w*.07,y:-h*.1},{x:-w*.13,y:-h*.06}], '#262c29');
+ctx.fillStyle='#424941';ctx.fillRect(-w*.16,-h*.16,w*.23,h*.065);ctx.fillStyle='#171c19';ctx.fillRect(w*.055,-h*.155,w*.25,h*.027);ctx.fillStyle='#303832';ctx.fillRect(-w*.015,-h*.19,w*.09,h*.11);ctx.fillStyle='#111713';ctx.fillRect(w*.29,-h*.157,w*.09,h*.02);ctx.fillStyle='#5b655a';ctx.fillRect(w*.03,-h*.2,w*.08,h*.018);ctx.fillStyle='#252b26';poly([{x:-w*.02,y:-h*.1},{x:w*.025,y:-h*.1},{x:w*.05,y:-h*.025},{x:-w*.01,y:-h*.025}], '#252b26');
+}else{ // Sniper rifle with scope
+poly([{x:-w*.21,y:-h*.16},{x:-w*.13,y:-h*.19},{x:-w*.08,y:-h*.09},{x:-w*.15,y:-h*.055}], '#292f2a');
+ctx.fillStyle='#414a41';ctx.fillRect(-w*.17,-h*.15,w*.29,h*.05);ctx.fillStyle='#171c18';ctx.fillRect(w*.12,-h*.14,w*.28,h*.018);ctx.fillStyle='#252c27';ctx.fillRect(-w*.01,-h*.21,w*.13,h*.045);ctx.fillStyle='#111';ctx.fillRect(w*.015,-h*.23,w*.1,h*.025);ctx.fillStyle='#626e61';ctx.fillRect(w*.055,-h*.235,w*.025,h*.035);ctx.fillStyle='#252b26';poly([{x:-w*.02,y:-h*.1},{x:w*.025,y:-h*.1},{x:w*.045,y:-h*.02},{x:-w*.02,y:-h*.02}], '#252b26');
+}
+// hands/gloves around grip
+ctx.fillStyle='#8a7658';poly([{x:-w*.045,y:-h*.105},{x:w*.005,y:-h*.12},{x:w*.04,y:-h*.055},{x:w*.01,y:-h*.025},{x:-w*.035,y:-h*.05}], '#6c624d');
+ctx.fillStyle='#9b8561';poly([{x:w*.04,y:-h*.09},{x:w*.095,y:-h*.1},{x:w*.13,y:-h*.055},{x:w*.085,y:-h*.035}], '#77694e');
+ctx.restore();
+if(flash>0){ctx.fillStyle='#ffe7a1';ctx.beginPath();ctx.moveTo(w*.82,h*.82);ctx.lineTo(w*.9,h*.77);ctx.lineTo(w*.86,h*.86);ctx.lineTo(w*.92,h*.89);ctx.lineTo(w*.82,h*.88);ctx.closePath();ctx.fill()}
+}
+function loop(t){let dt=Math.min(.04,(t-last)/1000||0);last=t;update(dt);draw();requestAnimationFrame(loop)}
+$('start').onclick=reset;requestAnimationFrame(loop);
+})();
+</script></body></html>
